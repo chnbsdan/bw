@@ -1547,7 +1547,7 @@
                             if (match) id = match[1];
                         }
                         
-                        var baseUrl = 'https://cn.bing.com/th?id=' + id;
+                        thumb: item.thumb || baseUrl + '_400x240.jpg'
                         
                         return {
                             date: formattedDate,
