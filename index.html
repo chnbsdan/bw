@@ -1951,45 +1951,55 @@
             }
 
             function downloadImage(index, resolution) {
-                if (!allData || allData.length === 0) return;
-                var item = allData[index];
-                if (!item) return;
-                var fileName = getDownloadFileName(item, resolution);
-                var isHistory = item.isHistory || false;
-                var isMobileRes = (resolution === 'mobile' || resolution === 'mobile_s');
-                var url = getImageUrl(item, resolution);
-                if (!url) { console.warn('⚠️ 无效的下载地址'); return; }
+    if (!allData || allData.length === 0) return;
+    var item = allData[index];
+    if (!item) return;
+    var fileName = getDownloadFileName(item, resolution);
+    var isHistory = item.isHistory || false;
+    var isMobileRes = (resolution === 'mobile' || resolution === 'mobile_s');
+    
+    // ★★★ 直接从 urls 里取，不用 getImageUrl ★★★
+    var url = '';
+    if (item.urls) {
+        if (resolution === '4k') url = item.urls.uhd || '';
+        else if (resolution === 'fhd') url = item.urls.fhd || '';
+        else if (resolution === 'hd') url = item.urls.hd || '';
+        else if (resolution === 'mobile') url = item.urls.mobile || '';
+        else if (resolution === 'mobile_s') url = item.urls.mobile_s || '';
+        else url = item.urls.fhd || '';
+    }
+    if (!url) { console.warn('⚠️ 无效的下载地址'); return; }
 
-                function tryDownload(downloadUrl) {
-                    fetch(downloadUrl, { mode: 'cors' })
-                        .then(function(response) {
-                            if (!response.ok) throw new Error('网络请求失败');
-                            return response.blob();
-                        })
-                        .then(function(blob) {
-                            if (isMobileRes) {
-                                if (isHistory) {
-                                    cropToMobile(blob, fileName, resolution);
-                                } else {
-                                    downloadBlob(blob, fileName);
-                                }
-                            } else {
-                                downloadBlob(blob, fileName);
-                            }
-                        })
-                        .catch(function(err) {
-                            console.warn('⚠️ 下载失败，直接打开:', err.message);
-                            var link = document.createElement('a');
-                            link.href = downloadUrl;
-                            link.download = fileName;
-                            link.target = '_blank';
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                        });
+    function tryDownload(downloadUrl) {
+        fetch(downloadUrl, { mode: 'cors' })
+            .then(function(response) {
+                if (!response.ok) throw new Error('网络请求失败');
+                return response.blob();
+            })
+            .then(function(blob) {
+                if (isMobileRes) {
+                    if (isHistory) {
+                        cropToMobile(blob, fileName, resolution);
+                    } else {
+                        downloadBlob(blob, fileName);
+                    }
+                } else {
+                    downloadBlob(blob, fileName);
                 }
-                tryDownload(url);
-            }
+            })
+            .catch(function(err) {
+                console.warn('⚠️ 下载失败，直接打开:', err.message);
+                var link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = fileName;
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+    }
+    tryDownload(url);
+}
 
             var downloadMenu = document.getElementById('downloadMenu');
             if (downloadMenu) {
