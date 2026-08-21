@@ -1267,11 +1267,6 @@
             </div>
 
             <div class="nav-right">
-                <!-- ★★★ 已移除 "历史" 链接 ★★★ -->
-                <!-- <a href="/history.html" class="nav-link" title="历史时光">
-                    <i class="fas fa-clock"></i>
-                    <span>历史</span>
-                </a> -->
                 <button class="nav-link" id="commentNavBtn" title="留言">
                     <i class="fas fa-comment"></i>
                     <span>留言</span>
@@ -1293,8 +1288,6 @@
         <!-- 移动端下拉菜单 -->
         <div class="nav-mobile-menu" id="navMobileMenu">
             <a href="/" class="nav-mobile-link"><i class="fas fa-home"></i> 首页</a>
-            <!-- ★★★ 已移除移动端 "历史时光" 链接 ★★★ -->
-            <!-- <a href="/history.html" class="nav-mobile-link"><i class="fas fa-clock"></i> 历史时光</a> -->
             <button class="nav-mobile-link" id="commentNavBtnMobile"><i class="fas fa-comment"></i> 留言</button>
             <a href="/api" class="nav-mobile-link" target="_blank"><i class="fas fa-code"></i> API</a>
             <a href="https://aoso.hangdn.com" class="nav-mobile-link" target="_blank"><i class="fas fa-blog"></i> 博客</a>
@@ -1412,7 +1405,7 @@
             var toolbar = document.getElementById('toolbar');
             var infoPanel = document.getElementById('infoPanel');
 
-            // ---- ★★★ 导航栏悬停显示 ★★★ ----
+            // ---- 导航栏悬停显示 ----
             var navbarModern = document.getElementById('navbar');
             var hoverTimer = null;
             var isNavVisible = false;
@@ -1532,62 +1525,58 @@
                 return false;
             }
 
+            // ★★★ 修复后的 getImageUrl ★★★
             function getImageUrl(item, resolution) {
-    if (!item) return '';
-    
-    // ★★★ 如果数据里有完整的 jpg 链接（来自 data.json），直接用 ★★★
-    if (item.jpg) {
-        var baseUrl = item.jpg.replace('_UHD.jpg', '').replace('_1920x1080.jpg', '');
-        var resMap = {
-            '4k': '_UHD.jpg',
-            'fhd': '_1920x1080.jpg',
-            'hd': '_1920x1200.jpg',
-            'mobile': '_1080x1920.jpg',
-            'mobile_s': '_768x1280.jpg',
-            'thumb': '_400x240.jpg'
-        };
-        var suffix = resMap[resolution] || '_1920x1080.jpg';
-        return baseUrl + suffix;
-    }
-    
-    // ★★★ 兼容旧格式（有 urlbase） ★★★
-    if (item.urlbase) {
-        if (isHistoryData(item)) {
-            return item.urlbase || item.thumb || '';
-        }
-        var baseUrl = 'https://www.bing.com' + item.urlbase;
-        var resMap = {
-            '4k': '_UHD.jpg',
-            'fhd': '_1920x1080.jpg',
-            'hd': '_1920x1200.jpg',
-            'mobile': '_1080x1920.jpg',
-            'mobile_s': '_768x1280.jpg',
-            'thumb': '_400x240.jpg'
-        };
-        var suffix = resMap[resolution] || '_1920x1080.jpg';
-        return baseUrl + suffix;
-    }
-    
-    return '';
-}
+                if (!item) return '';
+                
+                // 如果数据里有完整的 jpg 链接（来自 data.json），直接用
+                if (item.jpg) {
+                    var baseUrl = item.jpg.replace('_UHD.jpg', '').replace('_1920x1080.jpg', '');
+                    var resMap = {
+                        '4k': '_UHD.jpg',
+                        'fhd': '_1920x1080.jpg',
+                        'hd': '_1920x1200.jpg',
+                        'mobile': '_1080x1920.jpg',
+                        'mobile_s': '_768x1280.jpg',
+                        'thumb': '_400x240.jpg'
+                    };
+                    var suffix = resMap[resolution] || '_1920x1080.jpg';
+                    return baseUrl + suffix;
+                }
+                
+                // 兼容旧格式（有 urlbase）
+                if (item.urlbase) {
+                    if (isHistoryData(item)) {
+                        return item.urlbase || item.thumb || '';
+                    }
+                    var baseUrl = 'https://www.bing.com' + item.urlbase;
+                    var resMap = {
+                        '4k': '_UHD.jpg',
+                        'fhd': '_1920x1080.jpg',
+                        'hd': '_1920x1200.jpg',
+                        'mobile': '_1080x1920.jpg',
+                        'mobile_s': '_768x1280.jpg',
+                        'thumb': '_400x240.jpg'
+                    };
+                    var suffix = resMap[resolution] || '_1920x1080.jpg';
+                    return baseUrl + suffix;
+                }
+                
+                return '';
+            }
 
-            // ---- ★★★ 加载数据 - 改为读取 /data/data.json ★★★ ----
+            // ---- 加载数据 ----
             async function loadData() {
                 showProgress();
                 try {
-                    // ★★★ 数据源改为 /data/data.json ★★★
                     var url = BASE_PATH + '/data/data.json';
                     var res = await fetch(url);
                     if (!res.ok) throw new Error('HTTP ' + res.status);
                     var rawData = await res.json();
                     if (!Array.isArray(rawData) || rawData.length === 0) { showEmpty(); hideProgress(); return; }
-                    
-                    // ★★★ 数据已经是目标格式，直接使用 ★★★
                     allData = rawData.map(function(item) {
-                        // 处理可能存在的 startdate 字段（兼容性）
                         var dateStr = item.date || item.startdate || '';
                         var formattedDate = dateStr;
-                        // 如果是 8 位数字格式，转为 YYYY-MM-DD
                         if (/^\d{8}$/.test(dateStr)) {
                             formattedDate = dateStr.slice(0,4) + '-' + dateStr.slice(4,6) + '-' + dateStr.slice(6,8);
                         }
@@ -1597,6 +1586,8 @@
                             title: item.copyright || item.title || '',
                             urlbase: item.urlbase || '',
                             isHistory: isHistoryData(item),
+                            jpg: item.jpg || '',
+                            thumb: item.thumb || '',
                             urls: {
                                 uhd: item.jpg || '',
                                 fhd: item.jpg || '',
@@ -1607,7 +1598,6 @@
                             }
                         };
                     });
-                    
                     allData.sort(function(a, b) { return b.date.localeCompare(a.date); });
                     filteredData = [];
                     if (totalNavCount) totalNavCount.textContent = allData.length;
@@ -1618,11 +1608,7 @@
                     grid.innerHTML = '';
                     renderPage(1);
                     hideProgress();
-                } catch (err) { 
-                    console.error('加载失败:', err); 
-                    showEmpty(); 
-                    hideProgress(); 
-                }
+                } catch (err) { console.error('加载失败:', err); showEmpty(); hideProgress(); }
             }
 
             function renderPage(page) {
@@ -2018,11 +2004,9 @@
 
             // ---- 启动 ----
             loadData();
-            console.log('✅ 导航栏已升级：默认隐藏，鼠标移入顶部显示');
-            console.log('✅ 移动端：搜索框 + 汉堡按钮已显示');
-            console.log('✅ 壁纸统计已添加');
             console.log('✅ 数据源已改为 /data/data.json');
             console.log('✅ 历史链接已移除');
+            console.log('✅ 下载功能已修复');
             window.openComment = openComment;
         })();
     </script>
