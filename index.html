@@ -1389,7 +1389,6 @@
             var previewCopyright = document.getElementById('previewCopyright');
             var previewDate = document.getElementById('previewDate');
             var previewDesc = document.getElementById('previewDesc');
-            var totalNavCount = document.getElementById('totalNavCount');
             var navBadge = document.getElementById('navBadge');
             var searchInput = document.getElementById('searchInput');
             var searchBtn = document.getElementById('searchBtn');
@@ -1510,59 +1509,65 @@
             if (commentOverlay) commentOverlay.addEventListener('click', function(e) { if (e.target === commentOverlay) closeComment(); });
             document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && commentOverlay.classList.contains('active')) closeComment(); });
 
+            // ---- ★★★ 核心修复：getImageUrl - 直接使用数据中的字段 ★★★ ----
+            function getImageUrl(item, resolution) {
+                if (!item) return '';
+                
+                // 1. 缩略图直接返回 thumb
+                if (resolution === 'thumb' || resolution === 'thumbnail') {
+                    return item.thumb || item.jpg || '';
+                }
+                
+                // 2. 如果没有 jpg，尝试用 urlbase 兼容旧数据
+                if (!item.jpg && item.urlbase) {
+                    var baseUrl = 'https://www.bing.com' + item.urlbase + '_1920x1080.jpg';
+                    var resMap = {
+                        '4k': '_UHD.jpg',
+                        'fhd': '_1920x1080.jpg',
+                        'hd': '_1920x1200.jpg',
+                        'mobile': '_1080x1920.jpg',
+                        'mobile_s': '_768x1280.jpg'
+                    };
+                    var suffix = resMap[resolution] || '_1920x1080.jpg';
+                    return baseUrl.replace(/_\d+x\d+\.jpg$/, suffix);
+                }
+                
+                // 3. 主要逻辑：从 jpg 生成各分辨率
+                var baseUrl = item.jpg || '';
+                if (!baseUrl) return '';
+                
+                // 如果是历史数据（包含 bing.hangdn.net），直接返回原图
+                if (baseUrl.includes('bing.hangdn.net')) {
+                    return baseUrl;
+                }
+                
+                // 如果是必应官方数据（cn.bing.com 或 www.bing.com），替换分辨率后缀
+                if (baseUrl.includes('cn.bing.com') || baseUrl.includes('www.bing.com')) {
+                    var resMap = {
+                        '4k': '_UHD.jpg',
+                        'fhd': '_1920x1080.jpg',
+                        'hd': '_1920x1200.jpg',
+                        'mobile': '_1080x1920.jpg',
+                        'mobile_s': '_768x1280.jpg'
+                    };
+                    var suffix = resMap[resolution] || '_UHD.jpg';
+                    // 替换 _UHD.jpg 或 _1920x1080.jpg 为对应分辨率
+                    return baseUrl.replace(/_(UHD|1920x1080|1920x1200|1080x1920|768x1280)\.jpg$/, suffix);
+                }
+                
+                // 其他情况，返回原图
+                return baseUrl;
+            }
+
             // ---- 判断数据类型 ----
             function isHistoryData(item) {
                 if (!item) return false;
                 if (item.isHistory) return true;
-                var url = item.urlbase || '';
+                var url = item.urlbase || item.jpg || '';
+                if (url.includes('cdn.bimg.cc')) return true;
                 if (url.includes('/originals/')) return true;
                 if (url.startsWith('http') && !url.includes('bing.com')) return true;
-                if (url.startsWith('/originals/')) return true;
-                var date = item.date || '';
-                if (date && date.startsWith('201')) {
-                    if (!url.includes('th?id=')) return true;
-                }
                 return false;
-            }
-
-            // ★★★ 修复后的 getImageUrl ★★★
-            function getImageUrl(item, resolution) {
-                if (!item) return '';
-                
-                // 如果数据里有完整的 jpg 链接（来自 data.json），直接用
-                if (item.jpg) {
-                    var baseUrl = item.jpg.replace('_UHD.jpg', '').replace('_1920x1080.jpg', '');
-                    var resMap = {
-                        '4k': '_UHD.jpg',
-                        'fhd': '_1920x1080.jpg',
-                        'hd': '_1920x1200.jpg',
-                        'mobile': '_1080x1920.jpg',
-                        'mobile_s': '_768x1280.jpg',
-                        'thumb': '_400x240.jpg'
-                    };
-                    var suffix = resMap[resolution] || '_1920x1080.jpg';
-                    return baseUrl + suffix;
-                }
-                
-                // 兼容旧格式（有 urlbase）
-                if (item.urlbase) {
-                    if (isHistoryData(item)) {
-                        return item.urlbase || item.thumb || '';
-                    }
-                    var baseUrl = 'https://www.bing.com' + item.urlbase;
-                    var resMap = {
-                        '4k': '_UHD.jpg',
-                        'fhd': '_1920x1080.jpg',
-                        'hd': '_1920x1200.jpg',
-                        'mobile': '_1080x1920.jpg',
-                        'mobile_s': '_768x1280.jpg',
-                        'thumb': '_400x240.jpg'
-                    };
-                    var suffix = resMap[resolution] || '_1920x1080.jpg';
-                    return baseUrl + suffix;
-                }
-                
-                return '';
             }
 
             // ---- 加载数据 ----
@@ -1574,33 +1579,36 @@
                     if (!res.ok) throw new Error('HTTP ' + res.status);
                     var rawData = await res.json();
                     if (!Array.isArray(rawData) || rawData.length === 0) { showEmpty(); hideProgress(); return; }
+                    
                     allData = rawData.map(function(item) {
-                        var dateStr = item.date || item.startdate || '';
+                        var dateStr = item.date || '';
                         var formattedDate = dateStr;
                         if (/^\d{8}$/.test(dateStr)) {
                             formattedDate = dateStr.slice(0,4) + '-' + dateStr.slice(4,6) + '-' + dateStr.slice(6,8);
                         }
+                        var isHistory = isHistoryData(item);
                         return {
                             date: formattedDate,
-                            copyright: item.copyright || item.title || '',
-                            title: item.copyright || item.title || '',
+                            copyright: item.copyright || item.description || '',
+                            title: item.description || item.copyright || '',
                             urlbase: item.urlbase || '',
-                            isHistory: isHistoryData(item),
+                            isHistory: isHistory,
                             jpg: item.jpg || '',
                             thumb: item.thumb || '',
+                            // ★★★ 用 getImageUrl 生成各分辨率 URL ★★★
                             urls: {
-                                uhd: item.jpg || '',
-                                fhd: item.jpg || '',
-                                hd: item.jpg || '',
-                                mobile: item.jpg || '',
-                                mobile_s: item.jpg || '',
-                                thumb: item.thumb || item.jpg || ''
+                                uhd: getImageUrl(item, '4k'),
+                                fhd: getImageUrl(item, 'fhd'),
+                                hd: getImageUrl(item, 'hd'),
+                                mobile: getImageUrl(item, 'mobile'),
+                                mobile_s: getImageUrl(item, 'mobile_s'),
+                                thumb: getImageUrl(item, 'thumb')
                             }
                         };
                     });
+                    
                     allData.sort(function(a, b) { return b.date.localeCompare(a.date); });
                     filteredData = [];
-                    if (totalNavCount) totalNavCount.textContent = allData.length;
                     if (navBadge) navBadge.textContent = allData.length + ' 张';
                     totalPages = Math.ceil(allData.length / PAGE_SIZE);
                     currentPage = 1;
@@ -1625,10 +1633,11 @@
                 if (loadingEl) loadingEl.remove();
                 var footerEl = document.querySelector('.footer-end');
                 if (footerEl) footerEl.remove();
+                
                 items.forEach(function(item) {
                     var card = document.createElement('div');
                     card.className = 'card';
-                    var thumbSrc = item.urls.thumb || '';
+                    var thumbSrc = item.urls.thumb || item.thumb || '';
                     card.innerHTML = '<div class="placeholder-bg" style="background-image: url(' + thumbSrc + ');"></div><img src="' + thumbSrc + '" alt="' + (item.copyright || item.date) + '" loading="lazy" crossorigin="anonymous" /><div class="info"><div class="date">' + item.date + '</div><div class="title">' + (item.title || item.copyright || '无标题') + '</div><div class="copyright">' + (item.copyright || '') + '</div></div>';
                     var img = card.querySelector('img');
                     var placeholderBg = card.querySelector('.placeholder-bg');
@@ -1647,6 +1656,7 @@
                     });
                     grid.appendChild(card);
                 });
+                
                 if (page < totalPages) {
                     var loadingDiv = document.createElement('div');
                     loadingDiv.className = 'loading-indicator';
@@ -1747,7 +1757,7 @@
                 showPreview(currentPreviewIndex);
                 previewOverlay.classList.add('active');
                 document.body.style.overflow = 'hidden';
-                var imgSrc = currentPreviewItem.urls.fhd || '';
+                var imgSrc = currentPreviewItem.urls.fhd || currentPreviewItem.jpg || '';
                 previewOverlay.style.setProperty('--bg-url', 'url(' + imgSrc + ')');
                 applyToolbarVisibility(true);
                 previewImg.onclick = function(e) {
@@ -1786,12 +1796,12 @@
 
                 if (isMobile) {
                     if (isHistory) {
-                        imgSrc = currentPreviewItem.urls.fhd || currentPreviewItem.urls.uhd || '';
+                        imgSrc = currentPreviewItem.urls.fhd || currentPreviewItem.urls.uhd || currentPreviewItem.jpg || '';
                     } else {
-                        imgSrc = currentPreviewItem.urls.mobile_s || currentPreviewItem.urls.fhd || '';
+                        imgSrc = currentPreviewItem.urls.mobile_s || currentPreviewItem.urls.fhd || currentPreviewItem.jpg || '';
                     }
                 } else {
-                    imgSrc = currentPreviewItem.urls.fhd || '';
+                    imgSrc = currentPreviewItem.urls.fhd || currentPreviewItem.jpg || '';
                 }
 
                 previewImg.src = imgSrc;
@@ -1799,6 +1809,7 @@
                     var currentSrc = this.src;
                     if (currentSrc === currentPreviewItem.urls.fhd && currentPreviewItem.urls.hd) { this.src = currentPreviewItem.urls.hd; }
                     else if (currentSrc === currentPreviewItem.urls.hd && currentPreviewItem.urls.uhd) { this.src = currentPreviewItem.urls.uhd; }
+                    else if (currentPreviewItem.jpg) { this.src = currentPreviewItem.jpg; }
                     else { this.alt = '图片加载失败'; }
                 };
                 previewCopyright.textContent = currentPreviewItem.copyright || '';
