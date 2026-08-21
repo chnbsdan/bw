@@ -1533,22 +1533,43 @@
             }
 
             function getImageUrl(item, resolution) {
-                if (!item) return '';
-                if (isHistoryData(item)) {
-                    return item.urlbase || item.thumb || '';
-                }
-                var baseUrl = 'https://www.bing.com' + item.urlbase;
-                var resMap = {
-                    '4k': '_UHD.jpg',
-                    'fhd': '_1920x1080.jpg',
-                    'hd': '_1920x1200.jpg',
-                    'mobile': '_1080x1920.jpg',
-                    'mobile_s': '_768x1280.jpg',
-                    'thumb': '_400x240.jpg'
-                };
-                var suffix = resMap[resolution] || '_1920x1080.jpg';
-                return baseUrl + suffix;
-            }
+    if (!item) return '';
+    
+    // ★★★ 如果数据里有完整的 jpg 链接（来自 data.json），直接用 ★★★
+    if (item.jpg) {
+        var baseUrl = item.jpg.replace('_UHD.jpg', '').replace('_1920x1080.jpg', '');
+        var resMap = {
+            '4k': '_UHD.jpg',
+            'fhd': '_1920x1080.jpg',
+            'hd': '_1920x1200.jpg',
+            'mobile': '_1080x1920.jpg',
+            'mobile_s': '_768x1280.jpg',
+            'thumb': '_400x240.jpg'
+        };
+        var suffix = resMap[resolution] || '_1920x1080.jpg';
+        return baseUrl + suffix;
+    }
+    
+    // ★★★ 兼容旧格式（有 urlbase） ★★★
+    if (item.urlbase) {
+        if (isHistoryData(item)) {
+            return item.urlbase || item.thumb || '';
+        }
+        var baseUrl = 'https://www.bing.com' + item.urlbase;
+        var resMap = {
+            '4k': '_UHD.jpg',
+            'fhd': '_1920x1080.jpg',
+            'hd': '_1920x1200.jpg',
+            'mobile': '_1080x1920.jpg',
+            'mobile_s': '_768x1280.jpg',
+            'thumb': '_400x240.jpg'
+        };
+        var suffix = resMap[resolution] || '_1920x1080.jpg';
+        return baseUrl + suffix;
+    }
+    
+    return '';
+}
 
             // ---- ★★★ 加载数据 - 改为读取 /data/data.json ★★★ ----
             async function loadData() {
